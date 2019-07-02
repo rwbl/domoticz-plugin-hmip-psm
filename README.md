@@ -176,22 +176,24 @@ The **Domoticz homematicIP Pluggable Switch and Meter Devices** created are Name
 
 ## Plugin Pseudo Code
 Source code (well documented): plugin.py in folder /home/pi/domoticz/plugins/hmip-psm
-* INIT:
-	* set self vars to handle http connection, heartbeat count, datapoints list, switch state, set task
-* FIRST TIME:
-	* _onStart_ to create the Domoticz Devices
-* NEXT TIME(S):
-	*_onHeardbeat_
-		* create ip connection http with the raspberrymatic
-	*_onConnect_
-		* depending task, define the data (get,url,headers) to send to the ip connection
-		* send the data and disconnect
-	*_onMessage_
-		* parse the xml response
-		* if task switch update switch device and sync with homematic switch state
-		* if task meter update meter (enegergy) devices
-	*_onCommand_
-		* set task switch and create ip connection which is handled by onConnect
+__INIT__
+* set self vars to handle http connection, heartbeat count, datapoints list, switch state, set task
+	
+__FIRST TIME__
+* _onStart_ to create the Domoticz Devices
+	
+__NEXT TIME(S)__
+* _onHeardbeat_
+	* create ip connection http with the raspberrymatic
+* _onConnect_
+	* depending task, define the data (get,url,headers) to send to the ip connection
+	* send the data and disconnect
+* _onMessage_
+	* parse the xml response
+	* if task switch update switch device and sync with homematic switch state
+	* if task meter update meter (enegergy) devices
+* _onCommand_
+	* set task switch and create ip connection which is handled by onConnect
 
 If required, add the devices manually to the Domoticz Dashboard or create a roomplan / floorplan.
 
