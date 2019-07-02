@@ -34,7 +34,7 @@
         </ul>
     </description>
     <params>
-        <param field="Address" label="Host" width="200px" required="true" default="192.168.1.225"/>
+        <param field="Address" label="Host" width="200px" required="true" default="ccu-ip-address"/>
         <param field="Mode1" label="Device ID" width="75px" required="true" default="1418"/>
         <param field="Mode2" label="Datapoint SWITCH STATE" width="75px" required="true" default="1451"/>
         <param field="Mode3" label="Datapoints ENERGY" width="200px" required="true" default="1467,1471,1473,1465"/>
