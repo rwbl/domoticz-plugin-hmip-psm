@@ -172,6 +172,8 @@ The **Domoticz homematicIP Pluggable Switch and Meter Devices** created are Name
 * Current (Current)
 * Powerswitch (Switch)
 
+![domoticz-plugin-hmip-psm-d](https://user-images.githubusercontent.com/47274144/60536568-ce6b1680-9d06-11e9-98d0-f482067f062f.png)
+
 ## Plugin Pseudo Code
 Source code (well documented): plugin.py in folder /home/pi/domoticz/plugins/hmip-psm
 * INIT:
