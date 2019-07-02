@@ -23,7 +23,7 @@ __Note__
 This is my first attempt to create a Domoticz plugin for a HomeMatic device connected to a CCU (RaspberryMatic).
 There might be better solutions, but so far this solution is working ok .. and will be refined whilst working on next devices.
 
-<ADD SCREENSHOT>
+![domoticz-plugin-hmip-psm-f](https://user-images.githubusercontent.com/47274144/60536359-5ac90980-9d06-11e9-8863-4b968fb69d2c.PNG)
 
 ## Hardware
 * Raspberry Pi 3B+ (RaspberryMatic System)
