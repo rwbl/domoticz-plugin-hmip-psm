@@ -10,9 +10,9 @@
 
 
 """
-<plugin key="HMIP-PSM" name="homematicIP Pluggable Switch and Meter (HMIP-PSM)" author="rwbL" version="1.0 (Build 20190702)">
+<plugin key="HMIP-PSM" name="homematicIP Pluggable Switch and Meter (HMIP-PSM)" author="rwbL" version="1.01 (Build 201907026)">
     <description>
-        <h2>homematicIP Pluggable Switch and Meter (HMIP-PSM) v1.0</h2>
+        <h2>homematicIP Pluggable Switch and Meter (HMIP-PSM) v1.01</h2>
         <ul style="list-style-type:square">
             <li>Switch the device On or Off.</li>
             <li>Measure, in regular intervals, the power (W), energy (Wh), voltage (V), current (mA).</li>
@@ -26,16 +26,18 @@
         </ul>
         <h2>Configuration</h2>
         <ul style="list-style-type:square">
-            <li>Address (CCU IP address, i.e. 192.168.1.225)</li>
+            <li>CCU IP address (default: 192.168.1.225)</li>
             <li>IDs (obtained via XML-API script http://ccu-ip-address/config/xmlapi/statelist.cgi using the HomeMatic WebUI Device Channel, i.e. HMIP-PSM 0001D3C99C6AB3:3 (switch) or :6 (meter):</li>
-            <li>Device HMIP-PSM (i.e. 1418)</li>
-            <li>Datapoint SWITCH: STATE (i.e. 1451)</li>
-            <li>Datapoints ENERGY(#4): ENERGY_COUNTER, POWER, VOLTAGE, CURRENT as comma separated list in this order (i.e. 1467,1471,1473,1465)</li>
+            <ul style="list-style-type:square">
+                <li>Device ID HMIP-PSM (default: 1418)</li>
+                <li>Datapoint ID SWITCH: STATE (default: 1451)</li>
+            </ul>
+            <li>Datapoints ID ENERGY(#4): ENERGY_COUNTER, POWER, VOLTAGE, CURRENT as comma separated list in this order (default: 1467,1471,1473,1465)</li>
         </ul>
     </description>
     <params>
-        <param field="Address" label="Host" width="200px" required="true" default="ccu-ip-address"/>
-        <param field="Mode1" label="Device ID" width="75px" required="true" default="1418"/>
+        <param field="Address" label="CCU IP" width="200px" required="true" default="192.168.1.225"/>
+        <param field="Mode1" label="Device" width="75px" required="true" default="1418"/>
         <param field="Mode2" label="Datapoint SWITCH STATE" width="75px" required="true" default="1451"/>
         <param field="Mode3" label="Datapoints ENERGY" width="200px" required="true" default="1467,1471,1473,1465"/>
         <param field="Mode5" label="Check Interval (sec)" width="75px" required="true" default="60"/>
@@ -50,7 +52,7 @@
 """
 
 # Set the plugin version
-PLUGINVERSION = "v1.0"
+PLUGINVERSION = "v1.01"
 PLUGINSHORTDESCRIPTON = "HMIP-PSM"
 
 ## Imports
@@ -139,7 +141,7 @@ class BasePlugin:
         # Check the list length (4 because 4 datapoints required, i.e. energy counter, power, voltage, current)
         if len(self.DatapointsList) < 4:
             ## Devices[UNITTEXTSTATUS].Update( nValue=0, sValue="[ERROR] UID parameter not correct! Should contain 5 UIDs." )
-            Domoticz.Log("[ERROR] Datapoints parameter not correct! Should contain 4 datapoints.")
+            Domoticz.Error("[ERROR] Datapoints parameter not correct! Should contain 4 datapoints.")
         return
 
     def onStop(self):
@@ -179,7 +181,7 @@ class BasePlugin:
             return
         else:
             self.httpConnected = 0
-            Domoticz.Log("Failed to connect ("+str(Status)+") to: "+Parameters["Address"]+":"+Parameters["Port"]+" with error: "+Description)
+            Domoticz.Error("[ERROR]Failed to connect ("+str(Status)+") to: "+Parameters["Address"]+":"+Parameters["Port"]+" with error: "+Description)
             return
 
     # Parse the http xml response and update the domoticz devices
@@ -197,7 +199,7 @@ class BasePlugin:
         # Domoticz.Debug("DATA=" + responseData)
 
         if (responseStatus != 200):
-            Domoticz.Log("[ERROR] XML-API response: " + str(responseStatus) + ";" + resonseData)
+            Domoticz.Error("[ERROR] XML-API response: " + str(responseStatus) + ";" + resonseData)
             return
 
         # Parse the xml string 
@@ -219,7 +221,7 @@ class BasePlugin:
             Devices[UNITENERGY].Update( nValue=0, sValue=str(round(float(powervalue[0]),2)) + ";" + str(round(float(energycountervalue[0]),2)) )
             Devices[UNITVOLTAGE].Update( nValue=0, sValue=str(round(float(voltagevalue[0]),2)) )
             Devices[UNITCURRENT].Update( nValue=0, sValue=str(round(float(currentvalue[0]) * 0.001,2)) )
-            Domoticz.Log("Updated: E=" + Devices[UNITENERGY].sValue + ",V=" +  Devices[UNITVOLTAGE].sValue + ",A=" + Devices[UNITCURRENT].sValue + ",S=" + switchstate[0] + ";" + str(Devices[UNITSWITCH].nValue) )
+            Domoticz.Log("E=" + Devices[UNITENERGY].sValue + ",V=" +  Devices[UNITVOLTAGE].sValue + ",A=" + Devices[UNITCURRENT].sValue + ",S=" + switchstate[0] + ";" + str(Devices[UNITSWITCH].nValue) )
 
             ## Option to sync the switchstate if changed by the homematic webui
             if (switchstate[0] == 'true') and (Devices[UNITSWITCH].nValue == 0):
@@ -278,7 +280,7 @@ class BasePlugin:
                 self.httpConnected = 0
                 self.Task = TASKMETER
             except:
-                Domoticz.Log("[ERROR] Check settings, correct and restart Domoticz.")
+                Domoticz.Error("[ERROR] Check settings, correct and restart Domoticz.")
         return
         
 global _plugin
