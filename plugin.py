@@ -26,7 +26,7 @@
         </ul>
         <h2>Configuration</h2>
         <ul style="list-style-type:square">
-            <li>CCU IP address (default: 192.168.1.225)</li>
+            <li>CCU IP address (default: ccu-ip-address)</li>
             <li>IDs (obtained via XML-API script http://ccu-ip-address/config/xmlapi/statelist.cgi using the HomeMatic WebUI Device Channel, i.e. HMIP-PSM 0001D3C99C6AB3:3 (switch) or :6 (meter):</li>
             <ul style="list-style-type:square">
                 <li>Device ID HMIP-PSM (default: 1418)</li>
@@ -36,7 +36,7 @@
         </ul>
     </description>
     <params>
-        <param field="Address" label="CCU IP" width="200px" required="true" default="192.168.1.225"/>
+        <param field="Address" label="CCU IP" width="200px" required="true" default="ccu-ip-address"/>
         <param field="Mode1" label="Device" width="75px" required="true" default="1418"/>
         <param field="Mode2" label="Datapoint SWITCH STATE" width="75px" required="true" default="1451"/>
         <param field="Mode3" label="Datapoints ENERGY" width="200px" required="true" default="1467,1471,1473,1465"/>
