@@ -1,18 +1,19 @@
 # Domoticz Home Automation - homematicIP Pluggable Switch and Meter (HMIP-PSM)
 # Switch and measure, in regular intervals, the power (W), energy (Wh), voltage (V), current (mA).
-# @author Robert W.B. Linn
-# @version See plugin xml definition
-#
+# Dependencies
+# Library ElementTree (https://docs.python.org/3/library/xml.etree.elementtree.html#)
 # NOTE: after every change run
 # sudo service domoticz.sh restart
 # Domoticz Python Plugin Development Documentation:
 # https://www.domoticz.com/wiki/Developing_a_Python_plugin
-
+#
+# Author: Robert W.B. Linn
+# Version: See plugin xml definition
 
 """
-<plugin key="HMIP-PSM" name="homematicIP Pluggable Switch and Meter (HMIP-PSM)" author="rwbL" version="1.01 (Build 201907026)">
+<plugin key="HmIP-PSM" name="homematicIP Pluggable Switch and Meter (HmIP-PSM)" author="rwbL" version="1.1.0 (Build 20210118)">
     <description>
-        <h2>homematicIP Pluggable Switch and Meter (HMIP-PSM) v1.01</h2>
+        <h2>homematicIP Pluggable Switch and Meter (HmIP-PSM) v1.1.0</h2>
         <ul style="list-style-type:square">
             <li>Switch the device On or Off.</li>
             <li>Measure, in regular intervals, the power (W), energy (Wh), voltage (V), current (mA).</li>
@@ -22,24 +23,24 @@
             <li>Energy (kWh)</li>
             <li>Voltage (Voltage)</li>
             <li>Current (Current)</li>
-            <li>Powerswitch (Switch)</li>
+            <li>Switch (Switch)</li>
         </ul>
         <h2>Configuration</h2>
         <ul style="list-style-type:square">
-            <li>CCU IP address (default: ccu-ip-address)</li>
-            <li>IDs (obtained via XML-API script http://ccu-ip-address/config/xmlapi/statelist.cgi using the HomeMatic WebUI Device Channel, i.e. HMIP-PSM 0001D3C99C6AB3:3 (switch) or :6 (meter):</li>
+            <li>CCU IP address (default: 192.168.1.225)</li>
+            <li>IDs (obtained via XML-API script http://ccu-ip-address/addons/xmlapi/statelist.cgi using the HomeMatic WebUI Device Channel, i.e. HmIP-PSM 0001D3C99C6AB3:3 (switch) or :6 (meter):</li>
             <ul style="list-style-type:square">
-                <li>Device ID HMIP-PSM (default: 1418)</li>
+                <li>Device ID HmIP-PSM (default: 1418)</li>
                 <li>Datapoint ID SWITCH: STATE (default: 1451)</li>
             </ul>
-            <li>Datapoints ID ENERGY(#4): ENERGY_COUNTER, POWER, VOLTAGE, CURRENT as comma separated list in this order (default: 1467,1471,1473,1465)</li>
+            <li>Datapoint IDs ENERGY(#4): ENERGY_COUNTER, POWER, VOLTAGE, CURRENT as comma separated list in this order (default: 1467,1471,1473,1465)</li>
         </ul>
     </description>
     <params>
-        <param field="Address" label="CCU IP" width="200px" required="true" default="ccu-ip-address"/>
+        <param field="Address" label="CCU IP" width="200px" required="true" default="192.168.1.225"/>
         <param field="Mode1" label="Device" width="75px" required="true" default="1418"/>
-        <param field="Mode2" label="Datapoint SWITCH STATE" width="75px" required="true" default="1451"/>
-        <param field="Mode3" label="Datapoints ENERGY" width="200px" required="true" default="1467,1471,1473,1465"/>
+        <param field="Mode2" label="Datapoint ID STATE" width="75px" required="true" default="1451"/>
+        <param field="Mode3" label="Datapoint IDs ENERGY" width="200px" required="true" default="1467,1471,1473,1465"/>
         <param field="Mode5" label="Check Interval (sec)" width="75px" required="true" default="60"/>
         <param field="Mode6" label="Debug" width="75px">
             <options>
@@ -52,8 +53,8 @@
 """
 
 # Set the plugin version
-PLUGINVERSION = "v1.01"
-PLUGINSHORTDESCRIPTON = "HMIP-PSM"
+PLUGINVERSION = "v1.1.0"
+PLUGINSHORTDESCRIPTON = "HmIP-PSM"
 
 ## Imports
 import Domoticz
@@ -61,7 +62,7 @@ import urllib
 import urllib.request
 from datetime import datetime
 import json
-from lxml import etree
+import xml.etree.ElementTree as etree
 
 ## Domoticz device units used for creating & updating devices
 UNITENERGY = 1      # TypeName: kWh
@@ -159,13 +160,13 @@ class BasePlugin:
 
             # request device id datapoints to get the energy data
             if self.Task == TASKMETER:
-                ## url example = 'http://192.168.1.225/config/xmlapi/state.cgi?device_id=1418'
-                url = '/config/xmlapi/state.cgi?device_id=' + Parameters["Mode1"]
+                ## url example = 'http://192.168.1.225/addons/xmlapi/state.cgi?device_id=1418'
+                url = '/addons/xmlapi/state.cgi?device_id=' + Parameters["Mode1"]
                        
             # request state change for the switch with datapoint and new value
             if self.Task == TASKSWITCH:
-                ## url example = 'http://192.168.1.225/config/xmlapi/statechange.cgi?ise_id=1451&new_value=true'
-                url = '/config/xmlapi/statechange.cgi?ise_id=' + Parameters["Mode2"] + '&new_value=' + self.SwitchState
+                ## url example = 'http://192.168.1.225/addons/xmlapi/statechange.cgi?ise_id=1451&new_value=true'
+                url = '/addons/xmlapi/statechange.cgi?ise_id=' + Parameters["Mode2"] + '&new_value=' + self.SwitchState
 
             Domoticz.Debug(url)
             sendData = {'Verb' : 'GET',
@@ -193,10 +194,13 @@ class BasePlugin:
             return
 
         # Parse the JSON Data Object with keys Status (Number) and Data (ByteArray)
-        responseStatus = int(Data["Status"])         # 200 is OK
-        # Domoticz.Debug("STATUS="+ str(responseStatus))
-        responseData = Data["Data"].decode()         # XML string
-        # Domoticz.Debug("DATA=" + responseData)
+        ## 200 is OK
+        responseStatus = int(Data["Status"])
+        Domoticz.Debug("STATUS=responseStatus:" + str(responseStatus) + " ;Data[Status]="+Data["Status"])
+
+        ## decode the data using the encoding as given in the xml response string
+        responseData = Data["Data"].decode('ISO-8859-1')
+        ## Domoticz.Debug("DATA=" + responseData)
 
         if (responseStatus != 200):
             Domoticz.Error("[ERROR] XML-API response: " + str(responseStatus) + ";" + resonseData)
@@ -211,26 +215,28 @@ class BasePlugin:
         if self.Task == TASKMETER:
             Domoticz.Debug("TASKMETER")
             # Get the values for energy counter, power, voltage, current
-            # note that a list is returned from tree.xpath, but holds only 1 value
-            energycountervalue = tree.xpath('//datapoint[@ise_id=' + self.DatapointsList[DATAPOINTINDEXENERGYCOUNTER] + ']/@value')   # Domoticz.Debug(energycountervalue[0])
-            powervalue = tree.xpath('//datapoint[@ise_id=' + self.DatapointsList[DATAPOINTINDEXPOWER] + ']/@value')  # Domoticz.Debug(powervalue[0])
-            voltagevalue = tree.xpath('//datapoint[@ise_id=' + self.DatapointsList[DATAPOINTINDEXVOLTAGE] + ']/@value')  # Domoticz.Debug(voltagevalue[0])
-            currentvalue = tree.xpath('//datapoint[@ise_id=' + self.DatapointsList[DATAPOINTINDEXCURRENT] + ']/@value')  # Domoticz.Debug(currentvalue[0])
-            switchstate = tree.xpath('//datapoint[@ise_id=' + Parameters['Mode2'] + ']/@value')  # Domoticz.Debug(switchstate[0])
+            # actualtemperaturevalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXACTUALTEMPERATURE] + "']").attrib['value']
+
+            energycountervalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXENERGYCOUNTER] + "']").attrib['value']   # Domoticz.Debug(energycountervalue[0])
+            powervalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXPOWER] + "']").attrib['value']  # Domoticz.Debug(powervalue[0])
+            voltagevalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXVOLTAGE] + "']").attrib['value']  # Domoticz.Debug(voltagevalue[0])
+            currentvalue = tree.find(".//datapoint[@ise_id='" + self.DatapointsList[DATAPOINTINDEXCURRENT] + "']").attrib['value']  # Domoticz.Debug(currentvalue[0])
+            switchstate = tree.find(".//datapoint[@ise_id='" + Parameters['Mode2'] + "']").attrib['value']                                       # Domoticz.Debug(switchstate[0])
+
             ## Update the devices and log
-            Devices[UNITENERGY].Update( nValue=0, sValue=str(round(float(powervalue[0]),2)) + ";" + str(round(float(energycountervalue[0]),2)) )
-            Devices[UNITVOLTAGE].Update( nValue=0, sValue=str(round(float(voltagevalue[0]),2)) )
-            Devices[UNITCURRENT].Update( nValue=0, sValue=str(round(float(currentvalue[0]) * 0.001,2)) )
-            Domoticz.Log("E=" + Devices[UNITENERGY].sValue + ",V=" +  Devices[UNITVOLTAGE].sValue + ",A=" + Devices[UNITCURRENT].sValue + ",S=" + switchstate[0] + ";" + str(Devices[UNITSWITCH].nValue) )
+            Devices[UNITENERGY].Update( nValue=0, sValue=str(round(float(powervalue),2)) + ";" + str(round(float(energycountervalue),2)) )
+            Devices[UNITVOLTAGE].Update( nValue=0, sValue=str(round(float(voltagevalue),2)) )
+            Devices[UNITCURRENT].Update( nValue=0, sValue=str(round(float(currentvalue) * 0.001,2)) )
+            Domoticz.Log("E=" + Devices[UNITENERGY].sValue + ",V=" +  Devices[UNITVOLTAGE].sValue + ",A=" + Devices[UNITCURRENT].sValue + ",S=" + switchstate + ";" + str(Devices[UNITSWITCH].nValue) )
 
             ## Option to sync the switchstate if changed by the homematic webui
-            if (switchstate[0] == 'true') and (Devices[UNITSWITCH].nValue == 0):
+            if (switchstate == 'true') and (Devices[UNITSWITCH].nValue == 0):
                 Devices[UNITSWITCH].Update( nValue=1, sValue= '0')
-                Domoticz.Debug("Switch SYNC=" + switchstate[0] + ";" + str(Devices[UNITSWITCH].nValue) )
+                Domoticz.Debug("Switch SYNC=" + switchstate + ";" + str(Devices[UNITSWITCH].nValue) )
 
-            if (switchstate[0] == 'false') and (Devices[UNITSWITCH].nValue == 1):
+            if (switchstate == 'false') and (Devices[UNITSWITCH].nValue == 1):
                 Devices[UNITSWITCH].Update( nValue=0, sValue= '0')
-                Domoticz.Debug("Switch SYNC=" + switchstate[0] + ";" + str(Devices[UNITSWITCH].nValue) )
+                Domoticz.Debug("Switch SYNC=" + switchstate + ";" + str(Devices[UNITSWITCH].nValue) )
 
         if self.Task == TASKSWITCH:
             # The xml response data for the switch is like:
