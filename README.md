@@ -35,20 +35,24 @@ Versions for developing & using this plugin.
 * RaspberryMatic 3.45.7.20190622 [info](https://raspberrymatic.de/)
 * XML-API CCU Addon 1.20 [info](https://github.com/jens-maus/XML-API)
 * Python 3.5.3
-* Python library lxml XML toolkit 3.7.1-1 [info](https://lxml.de/)
+* Python module ElementTree
 
 ## Prepare
 The RaspberryMatic system has been setup according [these](https://github.com/jens-maus/RaspberryMatic) guidelines.
 
 The XML-API CCU Addon is required and installed via the HomeMatic WebUI > Settings > Control panel > Additional software (download the latest version from previous URL shared).
 
-The Python library lxml XML toolkit is used to parse HomeMatic XML-API response. Installed from the CLI:
+### Python Module ElementTree
+The Python Module **ElementTree XML API** is used to parse the XML-API response.
+This module is part of the standard package and provides limited support for XPath expressions for locating elements in a tree. 
+
+_Hint_
+(Optional)
+For full XPath support install the module **ElementPath** from the terminal command-line for Python 2.x and 3.x via pip:
 ``` 
-sudo apt-get install python3-lxml
+sudo pip install elementpath
+sudo pip3 install elementpath
 ```
-_Note_
-If the plugin is added to the Domoticz Hardware without lxml installed, then delete the hardware prior installing lxml.
-After installing lxml, restart Domoticz: sudo service domoticz.sh restart
 
 ## Plugin Folder and File
 Each plugin requires a dedicated folder which contains the plugin, mandatory named plugin.py.
