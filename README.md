@@ -1,5 +1,4 @@
 # Domoticz Plugin homematicIP Pluggable Switch and Meter (HMIP-PSM)
-v1.0 (Build 20190702)
 
 # Objectives
 * To switch the device on and off.
