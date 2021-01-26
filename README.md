@@ -1,48 +1,42 @@
 # Domoticz Plugin homematicIP Pluggable Switch and Meter (HMIP-PSM)
-Version see Changelog.
+Domoticz plugin for the homematicIP Pluggable Switch and Meter (HMIP-PSM).
 
 # Objectives
 * To switch the device on and off.
 * To measure, in regular intervals, the power (W), energy (Wh), voltage (V), current (mA).
 
-_Abbreviations_: GUI=Domoticz Web UI, CCU=HomeMatic Central-Control-Unit
-
 ## Solution
-To switch the power on/off and measure power (W) & energy consumption(Wh), a homematicIP Pluggable Switch and Meter (HMIP-PSM, Product ref.: 140666A0) is used.
-The HMIP-PSM is 
-* an actuator switch with status report measured value channel.
-* connected to a homematicIP system.
-
-The homematic IP system used is a [RaspberryMatic](https://raspberrymatic.de/) operating system running the HomeMatic Central-Control-Unit (CCU).
-
+The HMIP-PSM is connected to a homematic IP system.
+The homematic IP system used is a [RaspberryMatic](https://raspberrymatic.de/) operating system running the Homematic Central-Control-Unit (CCU).
 The CCU has the additional software XML-API CCU Addon installed.
-
 Communication between Domoticz and the CCU is via HTTP XML-API requests with HTTP XML response.
 
-__Note__
-This is my first attempt to create a Domoticz plugin for a HomeMatic device connected to a CCU (RaspberryMatic).
-There might be better solutions, but so far this solution is working ok .. and will be refined whilst working on next devices.
+In Domoticz, following device(s) is/are created:
+(Type,SubType) [XML-API Device Datapoint Type] - Note)
+* Energy (kWh) [ENERGY_COUNTER] [POWER] - Power is not used for a device, just logged only
+* Voltage (Voltage) [VOLTAGE]
+* Current (Current) [CURRENT]
+* Switch (Switch) [STATE]
 
-![domoticz-plugin-hmip-psm-f](https://user-images.githubusercontent.com/47274144/60536359-5ac90980-9d06-11e9-8863-4b968fb69d2c.PNG)
+The device state is updated every 60 seconds (default).
+
+If required, further actions can defined, by for example creating a dzVents script to send a notification / email (see below "dzVents Example").
 
 ## Hardware
+Hardware subject to change.
 * Raspberry Pi 3B+ (RaspberryMatic System)
-* homematicIP Pluggable Switch and Meter (HMIP-PSM, Product ref.: 140666A0)
+* homematicIP Pluggable Switch and Meter (HMIP-PSM)
 
 ## Software
-Versions for developing & using this plugin.
-* Raspberry Pi Raspian  4.19.42-v7+ #1219
-* RaspberryMatic 3.45.7.20190622 [info](https://raspberrymatic.de/)
+Software versions subject to change.
+* Raspberry Pi OS ( Raspbian GNU/Linux 10 buster, kernel 5.4.83-v7l+)
+* Domoticz 2020.2 (build 12847)
+* RaspberryMatic 3.55.5.20201226 [info](https://raspberrymatic.de/)
 * XML-API CCU Addon 1.20 [info](https://github.com/jens-maus/XML-API)
-* Python 3.5.3
+* Python 3.7.3
 * Python module ElementTree
 
-## Prepare
-The RaspberryMatic system has been setup according [these](https://github.com/jens-maus/RaspberryMatic) guidelines.
-
-The XML-API CCU Addon is required and installed via the HomeMatic WebUI > Settings > Control panel > Additional software (download the latest version from previous URL shared).
-
-### Python Module ElementTree
+**Note on the Python Module ElementTree**
 The Python Module **ElementTree XML API** is used to parse the XML-API response.
 This module is part of the standard package and provides limited support for XPath expressions for locating elements in a tree. 
 
@@ -54,176 +48,170 @@ sudo pip install elementpath
 sudo pip3 install elementpath
 ```
 
-## Plugin Folder and File
-Each plugin requires a dedicated folder which contains the plugin, mandatory named plugin.py.
+## RaspberryMatic Prepare
+The RaspberryMatic system has been setup according [these](https://github.com/jens-maus/RaspberryMatic) guidelines.
+
+The XML-API CCU Addon is required and installed via the HomeMatic WebUI > Settings > Control panel > Additional software (download the latest version from previous URL shared).
+**IMPORTANT**
+Be aware of the security risk, in case the HomeMatic Control Center can be reached via the Internet without special protection (see XML-API Guidelines).
+
+### XML-API Scripts
+The XML-API provides various tool scripts, i.e. devices state list, device state or set new value and many more.
+The scripts are submitted via HTTP XML-API requests.
+The plugin makes selective use of scripts with device id and datapoint id's.
+The device id is required to get the state of the device datapoints. The datapoint id's are required to get the state/value of device attributes.
+
+#### Device ID (statelist.cgi)
+Get Device ID (attribute "ise_id") from list of all devices with channels and current values: http://ccu-ip-address/addons/xmlapi/statelist.cgi.
+
+From the HTTP XML-API response, the Device ID ("ise_id") is selected by searching for the
+* Device Name (i.e. Schalt-Mess-Steckdose MakeLab) or 
+* Device Channel (HMIP-PSM 0001D3C99C6AB3:3 Switch actuator). 
+The data is obtained from the HomeMatic WebUI Home page > Status and control > Devices.
+The Device "ise_id" is required for the plugin parameter _Mode1_.
+HTTP XML-API response: Device ID = 1418.
+```
+...
+<device name="Schalt-Mess-Steckdose MakeLab" ise_id="1418" unreach="false" config_pending="false">
+	<channel...>
+</device>
+...
+```
+This script 
+* has to be run once from a browser prior installing the plugin to get the device id as required by the plugin parameter Device ID ("mode1") and the next script.
+* is not used in the plugin.
+
+#### Channel Datapoint(s) (state.cgi)
+Request the Channel Datapoint(s) for a Device ID to get value(s) for selected attribute(s): http://ccu-ip-address/addons/xmlapi/state.cgi?device_id=DEVICE_ISE_ID
+The **Device ID 1418** is used as parameter to get the device state from which the attributes can be selected. 
+The HTTP XML-API response lists eight Channels from which channels **HmIP-SWDM 001558A99D5A78:3** and **HMIP-PSM 0001D3C99C6AB3:6** are used.
+The datapoint(s) used:
+* Channel 3: type="STATE" with ise_id="1451" to set/get the state of the switch. The value is from valuetype 2, i.e. true (ON) or false (OFF).
+* Channel 6: type=ENERGY_COUNTER, POWER, VOLTAGE, CURRENT.
+The datapoint "ise_id" is required for the plugin parameter _Mode2_.
+```
+<device name="Schalt-Mess-Steckdose MakeLab" ise_id="1418" unreach="false" config_pending="false">
+<channel name="Schalt-Mess-Steckdose MakeLab:0" ise_id="1419" index="0" visible="true" operate="false">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.CONFIG_PENDING" type="CONFIG_PENDING" ise_id="1420" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.DUTY_CYCLE" type="DUTY_CYCLE" ise_id="1424" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.OPERATING_VOLTAGE" type="OPERATING_VOLTAGE" ise_id="1426" value="0.000000" valuetype="4" valueunit="V" timestamp="0" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.OPERATING_VOLTAGE_STATUS" type="OPERATING_VOLTAGE_STATUS" ise_id="1427" value="0" valuetype="16" valueunit="" timestamp="0" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.RSSI_DEVICE" type="RSSI_DEVICE" ise_id="1428" value="190" valuetype="8" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.RSSI_PEER" type="RSSI_PEER" ise_id="1429" value="178" valuetype="8" valueunit="" timestamp="1611503042" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.UNREACH" type="UNREACH" ise_id="1430" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.UPDATE_PENDING" type="UPDATE_PENDING" ise_id="1434" value="false" valuetype="2" valueunit="" timestamp="1610968122" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.ACTUAL_TEMPERATURE" type="ACTUAL_TEMPERATURE" ise_id="3065" value="26.000000" valuetype="4" valueunit="°C" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.ACTUAL_TEMPERATURE_STATUS" type="ACTUAL_TEMPERATURE_STATUS" ise_id="3066" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.ERROR_CODE" type="ERROR_CODE" ise_id="3067" value="0" valuetype="8" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:0.ERROR_OVERHEAT" type="ERROR_OVERHEAT" ise_id="3068" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+</channel>
+	<channel name="HMIP-PSM 0001D3C99C6AB3:1" ise_id="1438" index="1" visible="true" operate="false">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:1.PRESS_LONG" type="PRESS_LONG" ise_id="1439" value="" valuetype="2" valueunit="" timestamp="0" operations="4"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:1.PRESS_SHORT" type="PRESS_SHORT" ise_id="1440" value="" valuetype="2" valueunit="" timestamp="0" operations="4"/>
+</channel>
+<channel name="HMIP-PSM 0001D3C99C6AB3:2" ise_id="1441" index="2" visible="true" operate="false">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:2.PROCESS" type="PROCESS" ise_id="1442" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:2.SECTION" type="SECTION" ise_id="1443" value="2" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:2.SECTION_STATUS" type="SECTION_STATUS" ise_id="1444" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+<datapoint name="HmIP-RF.0001D3C99C6AB3:2.STATE" type="STATE" ise_id="1445" value="true" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+</channel>
+	<channel name="HMIP-PSM 0001D3C99C6AB3:3" ise_id="1446" index="3" visible="true" operate="true">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:3.PROCESS" type="PROCESS" ise_id="1448" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:3.SECTION" type="SECTION" ise_id="1449" value="2" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:3.SECTION_STATUS" type="SECTION_STATUS" ise_id="1450" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:3.STATE" type="STATE" ise_id="1451" value="true" valuetype="2" valueunit="" timestamp="1611569595" operations="7"/>
+<datapoint name="HmIP-RF.0001D3C99C6AB3:3.COMBINED_PARAMETER" type="COMBINED_PARAMETER" ise_id="9533" value="" valuetype="20" valueunit="" timestamp="0" operations="2"/>
+</channel>
+<channel name="HMIP-PSM 0001D3C99C6AB3:4" ise_id="1452" index="4" visible="true" operate="true">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:4.PROCESS" type="PROCESS" ise_id="1454" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:4.SECTION" type="SECTION" ise_id="1455" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:4.SECTION_STATUS" type="SECTION_STATUS" ise_id="1456" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:4.STATE" type="STATE" ise_id="1457" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="7"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:4.COMBINED_PARAMETER" type="COMBINED_PARAMETER" ise_id="9534" value="" valuetype="20" valueunit="" timestamp="0" operations="2"/>
+</channel>
+	<channel name="HMIP-PSM 0001D3C99C6AB3:5" ise_id="1458" index="5" visible="true" operate="true">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:5.PROCESS" type="PROCESS" ise_id="1460" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:5.SECTION" type="SECTION" ise_id="1461" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:5.SECTION_STATUS" type="SECTION_STATUS" ise_id="1462" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:5.STATE" type="STATE" ise_id="1463" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="7"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:5.COMBINED_PARAMETER" type="COMBINED_PARAMETER" ise_id="9535" value="" valuetype="20" valueunit="" timestamp="0" operations="2"/>
+</channel>
+<channel name="HMIP-PSM 0001D3C99C6AB3:6" ise_id="1464" index="6" visible="true" operate="false">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.CURRENT" type="CURRENT" ise_id="1465" value="290.000000" valuetype="4" valueunit="mA" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.CURRENT_STATUS" type="CURRENT_STATUS" ise_id="1466" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.ENERGY_COUNTER" type="ENERGY_COUNTER" ise_id="1467" value="17602.100000" valuetype="4" valueunit="Wh" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.ENERGY_COUNTER_OVERFLOW" type="ENERGY_COUNTER_OVERFLOW" ise_id="1468" value="false" valuetype="2" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.FREQUENCY" type="FREQUENCY" ise_id="1469" value="49.970000" valuetype="4" valueunit="Hz" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.FREQUENCY_STATUS" type="FREQUENCY_STATUS" ise_id="1470" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.POWER" type="POWER" ise_id="1471" value="50.800000" valuetype="4" valueunit="W" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.POWER_STATUS" type="POWER_STATUS" ise_id="1472" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.VOLTAGE" type="VOLTAGE" ise_id="1473" value="226.000000" valuetype="4" valueunit="V" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:6.VOLTAGE_STATUS" type="VOLTAGE_STATUS" ise_id="1474" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+</channel>
+<channel name="HMIP-PSM 0001D3C99C6AB3:7" ise_id="1475" index="7" visible="true" operate="false"/>
+<channel name="HMIP-PSM 0001D3C99C6AB3:8" ise_id="3069" index="8" visible="true" operate="true">
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:8.WEEK_PROGRAM_CHANNEL_LOCKS" type="WEEK_PROGRAM_CHANNEL_LOCKS" ise_id="3070" value="0" valuetype="16" valueunit="" timestamp="1611569595" operations="5"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:8.WEEK_PROGRAM_TARGET_CHANNEL_LOCK" type="WEEK_PROGRAM_TARGET_CHANNEL_LOCK" ise_id="3071" value="" valuetype="16" valueunit="" timestamp="0" operations="2"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:8.WEEK_PROGRAM_TARGET_CHANNEL_LOCKS" type="WEEK_PROGRAM_TARGET_CHANNEL_LOCKS" ise_id="3072" value="" valuetype="16" valueunit="" timestamp="0" operations="2"/>
+	<datapoint name="HmIP-RF.0001D3C99C6AB3:8.COMBINED_PARAMETER" type="COMBINED_PARAMETER" ise_id="9536" value="" valuetype="20" valueunit="" timestamp="0" operations="2"/>
+</channel>
+</device>
+```
+This script 
+* has to be run once from a browser prior installing the plugin to get the datapoint id as required by the plugin hardware Datapoint ID STATE ("mode2").
+* is used in the plugin to get the device state in regular check intervals.
+#### Change Value (statechange.cgi)
+Change the State or Value for a Datapoint: http://ccu-ip-address/addons/xmlapi/statechange.cgi?ise_id=DATAPOINT_ISE_ID&new_value=NEW_VALUE
+
+This script is used by the plugin to turn the switch with ise_id=1451 to state ON (new_value="true") or OFF (new_value="false")
+
+#### Summary
+The device id "1418" (for the device named "Schalt-Mess-Steckdose MakeLab") is used to 
+* set/get the state "true" (ON) or "false" (OFF) of the channel "HmIP-RF.0001D3C99C6AB3:3" datapoint type "STATE", ise_id "1451". 
+* get the values from the channel "HmIP-RF.0001D3C99C6AB3:6" for the types ENERGY_COUNTER, POWER, VOLTAGE, CURRENT.
+
+## Domoticz Prepare
+Open in a browser, four tabs with the Domoticz GUI Tabs: 
+* Setup > Hardware = to add / delete the new hardware
+* Setup > Devices = to check the devices created by the new hardware (use button Refresh to get the latest values)
+* Setup > Log = to check the installation and check interval cycles for errors
+* Active Menu depending Domoticz Devices created/used = to check the devices value
+Ensure to have the latest Domoticz version installed: Domoticz GUI Tab Setup > Check for Update
+
+### Domoticz Plugin Installation
+
+### Plugin Folder and File
+Each plugin requires a dedicated folder which contains the plugin, mandatory named **plugin.py**.
+The folder is named according omematic IP device name. 
 ``` 
 mkdir /home/pi/domoticz/plugins/hmip-psm
 ``` 
 
-As a starter, take the template from [here](https://github.com/domoticz/domoticz/blob/master/plugins/examples/BaseTemplate.py) .
-Save as __plugin.py__ (this is a mandatory file name) in the folder __/home/pi/domoticz/plugins/hmip-psm__.
+Copy the file **plugin.py** to the folder.
 
-## Development Setup
-Development PC:
-* A shared drive Z: pointing to /home/pi/domoticz
-* GUI > Setup > Log
-* GUI > Setup > Hardware
-* GUI > Setup > Devices
-* WinSCP session connected to the Domoticz server (upload files)
-* Putty session connected to the Domoticz server (restarting Domoticz during development)
-
-The various GUI's are required to add the new hardware with its devices and monitor if the plugin code is running without errors.
-
-## Development Iteration
-The development process step used are:
-1. Develop z:\plugins\hmip-psm\plugin.py
-2. Make changes and save plugin.py
-3. Restart Domoticz from a terminal: sudo service domoticz.sh restart
-4. Wait a moment and refresh GUI > Log
-5. Check the log and fix as required
-
-!IMPORTANT!
-In the **GUI > Setup > Settings**, enable accepting new hardware.
-This is required to add new devices created by the plugin.
-
-## Datapoints
-To communicate between the CCU and Domoticz vv, the ise_id's for devices, channels and datapoint are used (id solution).
-Another option could be to use the name (i.e. name="HmIP-RF.0001D3C99C6AB3:3.STATE") but this requires to obtain the full device state list for every action.
-Tested the name solution, but the communication was rather slow.
-The id soltion is much faster and also more flexible in defining and obtaning information for devices, channels and datapoints.
-
-## Device Datapoint ID
-Steps to obtain the device datapoint id to be able to switch or read the meter data.
-The device datapoint id will be used in the plugin __parameter Mode1__.
-
-### Get Device Channels
-Get the device channels from the HomeMatic WebUI > Status and control > Devices > select name HMIP-PSM 0001D3C99C6AB3.
-There are two channels:
-* HMIP-PSM 0001D3C99C6AB3:3 Switch actuator
-* HMIP-PSM 0001D3C99C6AB3:6 Status report measured value channel
-
-### Get All Devices Statelist
-Submit in a webbrowser the HTTP URL XMLAPI request:
+### Restart Domoticz
 ``` 
-http://ccu-ip-address/config/xmlapi/statelist.cgi
-``` 
-The HTTP response is an XML string with the state list for all devices used (can be rather large depending number of devices connected).
-
-### Get Channel Datapoints
-In the XML response, search for the channels name HMIP-PSM 0001D3C99C6AB3:3 (the switch) and HMIP-PSM 0001D3C99C6AB3:6 (the meter).
-
-__Channel HMIP-PSM 0001D3C99C6AB3:3__
-_Example_
-``` 
-<channel ise_id="1446" name="HMIP-PSM 0001D3C99C6AB3:3" operate="true" visible="true" index="3">
-	<datapoint ise_id="1448" name="HmIP-RF.0001D3C99C6AB3:3.PROCESS" operations="5" timestamp="1562085867" valueunit="" valuetype="16" value="0" type="PROCESS"/>
-	<datapoint ise_id="1449" name="HmIP-RF.0001D3C99C6AB3:3.SECTION" operations="5" timestamp="1562085867" valueunit="" valuetype="16" value="2" type="SECTION"/>
-	<datapoint ise_id="1450" name="HmIP-RF.0001D3C99C6AB3:3.SECTION_STATUS" operations="5" timestamp="1562085867" valueunit="" valuetype="16" value="0" type="SECTION_STATUS"/>
-	<datapoint ise_id="1451" name="HmIP-RF.0001D3C99C6AB3:3.STATE" operations="7" timestamp="1562085867" valueunit="" valuetype="2" value="true" type="STATE"/>
-</channel>
-``` 
-The datapoint type="STATE" is used to switch the device via the XML-API script statechange.cgi using the ise_id (i.e. 1451).
-This datapoint id will be used in the plugin __parameter Mode2__.
-The value is from valuetype 2 = boolean, i.e. true or false.
-
-__Channel HMIP-PSM 0001D3C99C6AB3:6__
-_Example_
-``` 
-<channel ise_id="1464" name="HMIP-PSM 0001D3C99C6AB3:6" operate="true" visible="true" index="6">
-	<datapoint ise_id="1465" name="HmIP-RF.0001D3C99C6AB3:6.CURRENT" operations="5" timestamp="1561984819" valueunit="mA" valuetype="4" value="292.000000" type="CURRENT"/>
-	<datapoint ise_id="1466" name="HmIP-RF.0001D3C99C6AB3:6.CURRENT_STATUS" operations="5" timestamp="1561984819" valueunit="" valuetype="16" value="0" type="CURRENT_STATUS"/>
-	<datapoint ise_id="1467" name="HmIP-RF.0001D3C99C6AB3:6.ENERGY_COUNTER" operations="5" timestamp="1561984819" valueunit="Wh" valuetype="4" value="431.200000" type="ENERGY_COUNTER"/>
-	<datapoint ise_id="1468" name="HmIP-RF.0001D3C99C6AB3:6.ENERGY_COUNTER_OVERFLOW" operations="5" timestamp="1561984819" valueunit="" valuetype="2" value="false" type="ENERGY_COUNTER_OVERFLOW"/>
-	<datapoint ise_id="1469" name="HmIP-RF.0001D3C99C6AB3:6.FREQUENCY" operations="5" timestamp="1561984819" valueunit="Hz" valuetype="4" value="49.990000" type="FREQUENCY"/>
-	<datapoint ise_id="1470" name="HmIP-RF.0001D3C99C6AB3:6.FREQUENCY_STATUS" operations="5" timestamp="1561984819" valueunit="" valuetype="16" value="0" type="FREQUENCY_STATUS"/>
-	<datapoint ise_id="1471" name="HmIP-RF.0001D3C99C6AB3:6.POWER" operations="5" timestamp="1561984819" valueunit="W" valuetype="4" value="41.580000" type="POWER"/>
-	<datapoint ise_id="1472" name="HmIP-RF.0001D3C99C6AB3:6.POWER_STATUS" operations="5" timestamp="1561984819" valueunit="" valuetype="16" value="0" type="POWER_STATUS"/>
-	<datapoint ise_id="1473" name="HmIP-RF.0001D3C99C6AB3:6.VOLTAGE" operations="5" timestamp="1561984819" valueunit="V" valuetype="4" value="230.800000" type="VOLTAGE"/>
-	<datapoint ise_id="1474" name="HmIP-RF.0001D3C99C6AB3:6.VOLTAGE_STATUS" operations="5" timestamp="1561984819" valueunit="" valuetype="16" value="0" type="VOLTAGE_STATUS"/>
-</channel>
-``` 
-Various datapoint types (with id) are used: CURRENT (1465), ENERGY_COUNTER (1467), POWER (1471), VOLTAGE (1473).
-The datapoints id will be used in the plugin __parameter Mode3__ (comma separated list).
-
-### Test Switching
-Test switching the device via webbrowser HTTP URL XML-API request using the statechange.cgi script with the datapoint id and new value true or false.
-Switch ON:
-``` 
-http://ccu-ip-address/config/xmlapi/statechange.cgi?ise_id=1451&new_value=true
-``` 
-The HTTP response is an XML string.
-_Example_
-``` 
-<?xml version="1.0" encoding="ISO-8859-1"?>
-<result>
-	<changed id="1451" new_value="true"/>
-</result>
-``` 
-Switch OFF:
-``` 
-http://ccu-ip-address/config/xmlapi/statechange.cgi?ise_id=1451&new_value=false
+sudo service domoticz.sh restart
 ``` 
 
-_Note_
-Check the HomeMatic WebUI if the state of the channel has changed as well.
-
-<ADD SCREENSHOT>
-
-## Domoticz Devices
-The **Domoticz homematicIP Pluggable Switch and Meter Devices** created are Name (TypeName):
-* Energy (kWh)
-* Voltage (Voltage)
-* Current (Current)
-* Powerswitch (Switch)
-
-![domoticz-plugin-hmip-psm-d](https://user-images.githubusercontent.com/47274144/60536568-ce6b1680-9d06-11e9-98d0-f482067f062f.png)
-
-## Plugin Pseudo Code
-Source code (well documented): plugin.py in folder /home/pi/domoticz/plugins/hmip-psm
-__INIT__
-* set self vars to handle http connection, heartbeat count, datapoints list, switch state, set task
-	
-__FIRST TIME__
-* _onStart_ to create the Domoticz Devices
-	
-__NEXT TIME(S)__
-* _onHeardbeat_
-	* create ip connection http with the raspberrymatic
-* _onConnect_
-	* depending task, define the data (get,url,headers) to send to the ip connection
-	* send the data and disconnect
-* _onMessage_
-	* parse the xml response
-	* if task switch update switch device and sync with homematic switch state
-	* if task meter update meter (enegergy) devices
-* _onCommand_
-	* set task switch and create ip connection which is handled by onConnect
-
-If required, add the devices manually to the Domoticz Dashboard or create a roomplan / floorplan.
-
-## Restart Domoticz
-Restart Domoticz to find the plugin:
-```
-sudo systemctl restart domoticz.service
-```
-
-**Note**
-When making changes to the Python plugin code, ensure to restart Domoticz and refresh any of the Domoticz Web UI's.
-This is the iteration process during development - build the solution step-by-step.
-
-## Domoticz Add Hardware
+### Domoticz Add Hardware
 **IMPORTANT**
-Prior adding, set GUI > Settings the option to allow new hardware.
+Prior adding the hardware, set in Domoticz GUI > Settings the option to allow new hardware.
 If this option is not enabled, no new devices are created.
 Check the GUI > Setup > Log as error message Python script at the line where the new device is used
 (i.e. Domoticz.Debug("Device created: "+Devices[1].Name))
 
-In the GUI > Setup > Hardware add the new hardware **homematicIP Pluggable Switch and Meter (HMIP-PSM)**.
-The initial check interval is set at 60 seconds. This is a good value for testing, but for final version set to higher value like every 5 minutes (300 seconds).
+In the GUI > Setup > Hardware add the new hardware **homematicIP Pluggable Switch and Meter (HmIP-PSM)**.
+Define the hardware parameter:
+* CCU IP: The IP address of the homematic CCU. Default: 192.168.1.225.
+* Device ID: The device datapoint ise_id - taken from the XMLAPI statelist request. Default: 1418.
+* Datapoint STATE: The STATE datapoint ise_id - taken from the XMLAPI statelist request. Default: 1451.
+* Check Interval (sec): How often the state of the device is checked. Default: 60.
+* Debug: Set initially to true. If the plugin runs fine, update to false.
 
-## Add Hardware - Check the Domoticz Log
+### Add Hardware - Check the Domoticz Log
 After adding, ensure to check the Domoticz Log (GUI > Setup > Log)
-Example:
+Example
 ```
 2019-07-02 10:24:05.761 Status: (MakeLab Energy) Started. 
 2019-07-02 10:24:06.426 (MakeLab Energy) Debug logging mask set to: PYTHON PLUGIN QUEUE IMAGE DEVICE CONNECTION MESSAGE ALL 
@@ -267,10 +255,59 @@ Example:
 2019-07-02 10:24:06.424 Status: (MakeLab Energy) Initialized version 1.0 (Build 20190702), author 'rwbL'
 ```
 
-## Domoticz Log Entry with Debug=False
-The plugin runs every 60 seconds (Heartbeat interval) which is shown in the Domoticz log.
+### Domoticz Device List
+Idx, Hardware, Name, Type, SubType, Data
+74, MakeLab Energy, Energy, General, kWh, 17.685 kWh
+75, MakeLab Energy, Voltage, General, Voltage, 231.1 V
+76, MakeLab Energy, Current, General, Current, 0.22 A
+77, MakeLab Energy, Powerswitch, Light/Switch, Switch, On
+
+### Domoticz Log Entry with Debug=False
+The plugin runs every 60 seconds (Heartbeat interval).
 ```
-2019-07-02 19:13:42.528 (MakeLab Energy) Updated: E=26.46;82.8,V=231.2,A=0.19,S=true;1
+2021-01-25 12:57:14.640 (MakeLab Energy) HMIP-PSM: E=31.4;17671.9,V=229.6,A=0.23,S=true;1
+```
+
+## Domoticz dzVents Script alert_energy_kwh
+This is an example on how to alert via email
+```
+--[[
+    alert_energy_kwh.dzvents
+    Plugga (homematicIP device HmIP-PSM) Alert Example.
+    Send notification if the actual watt exceeds defined theshold.
+    20210120 rwbl
+]]--
+
+local IDX_ENERGY = 74;   -- Type General, SubType kWh
+local TH_ENERGY = 32;
+
+return {
+	on = {
+		devices = {
+			IDX_ENERGY
+		}
+	},
+    data = {
+        notified = { initial = 0 }
+    },
+	execute = function(domoticz, device)
+	    -- domoticz.log(('Device %s state changed to %s (%d) %.2f.'):format(
+		--     device.name, device.sValue, device.nValue, device.actualWatt), domoticz.LOG_INFO)
+		if device.actualWatt > TH_ENERGY and domoticz.data.notified == 0 then
+		    domoticz.data.notified = 1
+            -- Send notification via email
+            local subject = ('ENERGY ALERT'):format()
+            local message = ('Energy %s %.2fW is above threshold %dW.'):format(
+                device.name, device.actualWatt, TH_ENERGY)
+            domoticz.log(subject .. ':' .. message)
+            domoticz.notify(subject, message, domoticz.PRIORITY_HIGH)
+        else
+            if domoticz.data.notified == 1 then 
+                domoticz.data.notified = 0
+            end
+        end
+	end
+}
 ```
 
 ## ToDo
